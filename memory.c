@@ -2,6 +2,7 @@
 #include "memory.h"
 
 char instruction[256] , data[4096];
+int isize = sizeof(instruction) / sizeof(instruction[0]) , dsize = sizeof(data) / sizeof(data[0]);
 
 
 void initialize() //Intialize instruction and data memory
@@ -15,7 +16,7 @@ void initialize() //Intialize instruction and data memory
         instruction[i++] = (char) o1;
         instruction[i++] = (char) o2;
     }
-    for(; i < 256 ; i++)
+    for(; i < isize ; i++)
     {
         instruction[i] = 0;
     }
@@ -25,7 +26,7 @@ void initialize() //Intialize instruction and data memory
     {
         data[i++] = j;
     }
-    for(; i < 256;i++)
+    for(; i < dsize ;i++)
     {
         data[i] = 0;
     }
@@ -35,7 +36,7 @@ void finalize() // Finalize data.byte
 {
     fseek(dfile , 0 , SEEK_SET); //Bring file's internal pointer to the start of the file to output the data into the data.byte file 
     char out[20];
-    for(int i = 0 ; i < 256 ; i++)
+    for(int i = 0 ; i < dsize ; i++)
     {
         snprintf(out , sizeof(out) , "%d\n" , (unsigned char) data[i]);
         fputs(out , dfile);

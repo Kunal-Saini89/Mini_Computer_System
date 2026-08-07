@@ -10,7 +10,7 @@ extern int end_of_simulation;
 
 int main()
 {
-    printf(" 0 for custom code , 1 for sum of n numbers , 2 for multiply 2 complex numbers , 3 for determinat of matrix\n");
+    printf(" 0 for custom code\n 1 for sum of n numbers\n 2 for multiply 2 complex numbers\n 3 for determinat of matrix\n");
     int i = 0;
     scanf("%d" , &i);
     switch(i)
