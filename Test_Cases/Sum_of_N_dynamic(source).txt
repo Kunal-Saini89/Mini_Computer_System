@@ -1,0 +1,18 @@
+x1 = 0        % x1 = loop index (i = 0)
+x2 = 0        % x2 = running sum accumulator
+x3 = 0        % x3 = memory pointer for reading array elements
+x4 = [x3]     % read N (number of elements) from address 0x0
+
+.loopback
+x15 = x1 - x4 % compare index x1 with N
+BEQ .exit     % if index == N, jump to .exit
+
+x3 = x3 + 4   % advance memory pointer to next 4-byte integer
+x6 = [x3]     % load array element from memory
+x2 = x2 + x6  % update sum: sum = sum + element
+x1 = x1 + 1   % increment index: i++
+BAL .loopback % jump back to loop start
+
+.exit
+x7 = 16       % x7 = address 0x10 (where the output sum is stored)
+[x7] = x2     % write final sum to memory address 16

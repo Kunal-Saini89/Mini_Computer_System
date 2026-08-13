@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "Compiler.h"
 #include "processor.h"
 #include "memory.h"
@@ -10,7 +11,7 @@ extern int end_of_simulation;
 
 int main()
 {
-    printf(" 0 for custom code\n 1 for sum of n numbers\n 2 for multiply 2 complex numbers\n 3 for determinat of matrix\n");
+    printf(" 0 for custom code\n 1 for sum of n numbers\n 2 for FIR Filter\n");
     int i = 0;
     scanf("%d" , &i);
     switch(i)
@@ -24,23 +25,22 @@ int main()
 
         case 1 :
         {
-            ifile = fopen("Test_Cases/Sum n number(source).txt" , "r");
-            dfile = fopen("Test_Cases/Sum n number(data).byte" , "r+");
+            ifile = fopen("Test_Cases/Sum_of_N_dynamic(source).txt" , "r");
+            dfile = fopen("Test_Cases/Sum_of_N_dynamic(data).byte" , "r+");
             break;
         }
 
         case 2 :
         {
-            ifile = fopen("Test_Cases/Multiply 2 Complex (sorce).txt" , "r");
-            dfile = fopen("Test_Cases/Multiply 2 Complex (data).byte" , "r+");
+            ifile = fopen("Test_Cases/FIR_Filter(source).txt" , "r");
+            dfile = fopen("Test_Cases/FIR_Filter(data).byte" , "r+");
             break;
         }
 
-        case 3 :
+        default :
         {
-            ifile = fopen("Test_Cases/determinat of matrix(source).txt" , "r");
-            dfile = fopen("Test_Cases/determinat of matrix(data).byte" , "r+");
-            break;
+            fprintf(stderr, "Invalide Operation , exiting program....");
+            exit(EXIT_FAILURE);
         }
     }
     ofile = fopen("program.byte" , "w+"); //Program.byte file is common for all type of codes 
