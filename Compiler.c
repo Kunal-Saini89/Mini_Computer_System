@@ -2,16 +2,20 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <ctype.h>
 #include "Compiler.h"
 
-#define maxlablelength 50
+#define maxlablelength 100
 #define maxlablesupport 64
+#define maxinstlenght 100
+#define byteinstlength 20
 
 long long cchar = 0; // Variable that points to the current character in the file 
 int line = 1; // Points to current line
 long filesize; //Stores the number of B the file has
 long instcount = 0; //Stores number of instruction comiler so far
+int branchinst[maxlablesupport] , currinst = 0; // To handle the branch logic 
 
 typedef struct 
 {
@@ -70,6 +74,118 @@ void nextline() // Function to detect that we have gone to the next line / instr
     
 }
 
+void handlebranch()
+{
+    currinst = 0;
+    fseek(ifile , 0 , SEEK_SET);
+    fseek(ofile , 0 , SEEK_SET);
+    cchar = 0;
+    char line[maxinstlenght];
+    while(fgets(line , sizeof(line) , ifile) != NULL)
+    {
+        line[getinstcropindex(line , sizeof(line))] = '\0';
+        if(line[0] == 'B' || line[0] == 'b')
+        {
+            char t1 = toupper(advance());
+            char t2 = toupper(advance());
+            int opcode = 0, o2 = 0;
+
+            switch (t1)
+            {
+                case 'E': // EQ (0000 = 0)
+                    if (t2 == 'Q') opcode = 0;
+                    else throwerror();
+                        break;
+
+                case 'N': // NE (0001 = 1)
+                    if (t2 == 'E') opcode = 1;
+                    else throwerror();
+                    break;
+
+                case 'C': // CS (0010 = 2), CC (0011 = 3)
+                    if (t2 == 'S') opcode = 2;
+                    else if (t2 == 'C') opcode = 3;
+                    else throwerror();
+                    break;
+
+                case 'M': // MI (0100 = 4)
+                    if (t2 == 'I') opcode = 4;
+                    else throwerror();
+                    break;
+
+                case 'P': // PL (0101 = 5)
+                    if (t2 == 'L') opcode = 5;
+                    else throwerror();
+                    break;
+
+                case 'V': // VS (0110 = 6), VC (0111 = 7)
+                    if (t2 == 'S') opcode = 6;
+                    else if (t2 == 'C') opcode = 7;
+                    else throwerror();
+                    break;
+
+                case 'H': // HI (1000 = 8)
+                    if (t2 == 'I') opcode = 8;
+                    else throwerror();
+                    break;
+
+                case 'L': // LS (1001 = 9), LT (1011 = 11), LE (1101 = 13)
+                    if (t2 == 'S') opcode = 9;
+                    else if (t2 == 'T') opcode = 11;
+                    else if (t2 == 'E') opcode = 13;
+                    else throwerror();
+                    break;
+
+                case 'G': // GE (1010 = 10), GT (1100 = 12)
+                    if (t2 == 'E') opcode = 10;
+                    else if (t2 == 'T') opcode = 12;
+                    else throwerror();
+                    break;
+
+                case 'A': // AL (1110 = 14)
+                    if (t2 == 'L') opcode = 14;
+                    else throwerror();
+                    break;
+
+                default:
+                    throwerror();
+                    break;
+            }
+            t1 = advance();
+
+            if(t1 != '.') throwerror();
+
+            t1 = advance();
+            fseek(ifile , cchar , SEEK_SET);
+            if(fgets(line , maxlablelength , ifile) != NULL) //A error can be here
+            {
+                line[getlablecropindex(line , sizeof(line))] = '\0';
+            }
+
+            for(int i = 0; i < maxlablesupport; i++)
+            {
+                if(strcmp(record[i].name , line) == 0)
+                {
+                    o2 = record[i].offset - branchinst[currinst];
+                }
+            }
+            int op = 0 , test , offset;
+            while(fscanf(ofile , "%X %X %X %X\n" , &op , &test , &test , &test) == 4)
+            {
+                if(op == (0x10 + opcode))
+                {
+                    fseek(ofile , offset , SEEK_SET);
+                    output(0x10 + opcode , 0 , 0 , o2);
+                    currinst++;
+                    break;
+                }
+                offset = ftell(ofile);
+            }
+        }
+        cchar = ftell(ifile);
+    }
+}
+
 void compile() // Start compilation of a single instruction
 {
     char temp = getcurrchar();
@@ -109,8 +225,17 @@ void compile() // Start compilation of a single instruction
 
         case 'B':
         case 'b':
-            //advance();
-            compilebranch();
+            {
+                branchinst[currinst] = instcount;
+                compilebranch();
+                currinst++;
+                break;
+            }
+
+        case 'V':
+        case 'v' :
+            advance();
+            comiplevectormath();
             break;
 
         default:
@@ -131,7 +256,7 @@ void compilelable()
     char str[maxlablelength];
     if (fgets(str, sizeof(str), ifile) != NULL) 
     {
-        str[strcspn(str, "\r\n")] = '\0';
+        str[getlablecropindex(str , sizeof(str))] = '\0';
     }
     int i;
     for(i = 0; i < maxlablesupport ; i++)
@@ -226,18 +351,208 @@ void compilebranch()
     char str[maxlablelength];
     if (fgets(str, sizeof(str), ifile) != NULL) 
     {
-        str[strcspn(str, "\r\n")] = '\0';
+        str[getlablecropindex(str , sizeof(str))] = '\0';
     }
 
     for(int i = 0; i < maxlablesupport; i++)
     {
         if(strcmp(record[i].name , str) == 0)
         {
-            o2 = record[i].offset - instcount;
+            o2 = record[i].offset - instcount - 1;
         }
     }
     output(0x10 + opcode , 0 , 0 , o2);
     cchar = ftell(ifile);
+}
+
+int getlablecropindex(char * t , int size)
+{
+    int i = 0;
+    for(; i < size && t[i] != '\0'; i++)
+    {
+        if(isalnum(t[i]))
+        {
+            continue;
+        }
+        else
+        {
+            break;
+        }
+    }
+    return i;
+}
+
+int getinstcropindex(char* t , int size)
+{
+    int i = 0;
+    for(; i < size && t[i] != '\0'; i++)
+    {
+        if(t[i] == '\r' || t[i] == '\n' || t[i] == '%')
+        {
+            break;
+        }
+    }
+    return i;
+}
+
+void comiplevectormath()
+{
+    int dest , o1 , o2;
+    char temp = getcurrchar();
+
+    if(isdigit(temp))
+    {
+        dest = readnum();
+    }
+    else throwerror();
+
+    temp = getcurrchar();
+    if(temp == '=') temp = advance();
+    else throwerror();
+
+    if(temp == 'V' || temp == 'v') 
+    {
+        temp = advance();
+    }
+    else if(temp == '[') //Mem read instruction
+    {
+        temp = advance();
+
+        if(temp == 'X' || temp == 'x')
+        {
+            temp = advance();
+            if(isdigit(temp))
+            {
+                o2 = readnum();
+                output(0x25 , dest , 0 ,o2);
+            }
+        }
+        else if(isdigit(temp))
+        {
+            o2 = readnum();
+            output(0x2C , dest , 0 , o2);
+        }
+        else throwerror();
+        temp = getcurrchar();
+        if(temp != ']') throwerror();
+        advance();
+        return;
+    }
+    else throwerror();
+
+    if(isdigit(temp))
+    {
+        o1 = readnum();
+    }
+
+    char op = getcurrchar();
+    temp = advance();
+
+    if(temp == 'V' || temp == 'v') //Final output will be here
+    {
+        temp = advance();
+        if(isdigit(temp))
+        {
+            o2 = readnum();
+        }
+
+        switch(op)
+        {
+            case '+':
+            {
+                output(0x21 , dest , o1 , o2);
+                break;
+            }
+
+            case '-':
+            {
+                output(0x22 , dest , o1 , o2);
+                break;
+            }
+
+            case '*':
+            {
+                output(0x23 , dest , o1 , o2);
+                break;
+            }
+
+            default :
+            {
+                fprintf(stderr, "Invalid operation in line : %d\n", line);
+                exit(EXIT_FAILURE);
+            }
+        }
+        return;
+    }
+    else if(temp == 'X' || temp == 'x')
+    {
+        temp = advance();
+        if(isdigit(temp))
+        {
+            o2 = readnum();
+        }
+
+        switch(op)
+        {
+            case '+':
+            {
+                output(0x31 , dest , o1 , o2);
+                break;
+            }
+
+            case '-':
+            {
+                output(0x32 , dest , o1 , o2);
+                break;
+            }
+
+            case '*':
+            {
+                output(0x33 , dest , o1 , o2);
+                break;
+            }
+
+            default :
+            {
+                fprintf(stderr, "Invalid operation in line : %d\n", line);
+                exit(EXIT_FAILURE);
+            }
+        }
+        return;
+    }
+    else if(isdigit(temp))
+    {
+        o2 = readnum();
+
+        switch(op)
+        {
+            case '+':
+            {
+                output(0x29 , dest , o1 , o2);
+                break;
+            }
+
+            case '-':
+            {
+                output(0x2A , dest , o1 , o2);
+                break;
+            }
+
+            case '*':
+            {
+                output(0x2B , dest , o1 , o2);
+                break;
+            }
+
+            default :
+            {
+                fprintf(stderr, "Invalid operation in line : %d\n", line);
+                exit(EXIT_FAILURE);
+            }
+        }
+        return;
+    }
+    else throwerror();
 }
 
 void compileread() //Handle read instruction
@@ -320,17 +635,20 @@ void compilewrite() //Handle write instruction
 
 void compilenewwrite()
 {
-    int dest , o2;
+    int dest , o2 ;
+    bool isconstant;
     char temp = getcurrchar();
     if(temp == 'X' || temp == 'x')
     {
         temp = advance();
         if(isdigit(temp)) dest = readnum();
         else throwerror();
+        isconstant = false;
     } 
     else if(isdigit(temp))
     {
         dest = readnum();
+        isconstant = true;
     }
     else throwerror();
 
@@ -344,15 +662,24 @@ void compilenewwrite()
     if(temp == 'X' || temp == 'x') //address provided by the register
     {
         temp = advance();
-        o2 = readnum();
-        output(6 , dest , 0 , o2);
-        return;
+        if(isdigit(temp))
+        {
+            o2 = readnum();
+            output((isconstant ? 0x0E : 6) , dest , 0 , o2);
+            return;
+        }
+        else throwerror();
     }
-    else if(isdigit(temp)) //address provided by a constant
+    else if(temp == 'V' || temp == 'v')
     {
-        o2 = readnum();
-        output(14 , dest , 0 , o2);
-        return;
+        temp = advance();
+        if(isdigit(temp))
+        {
+            o2 = readnum();
+            output((isconstant ?  0x2E : 0x26), dest , 0 ,o2); // A doubt
+            return;
+        }
+        else throwerror();
     }
     else throwerror();
 }
@@ -470,7 +797,7 @@ void compilemath() //Handle math opertaions
 
 void throwerror() //Show error in the byte file
 {
-    fprintf(stderr, "Compilation error in line %d\n", line);
+    fprintf(stderr, "Compilation error in line %d , character : %c , peek : %c\n", line , getcurrchar() , peek());
     exit(EXIT_FAILURE);
 }
 
@@ -492,7 +819,7 @@ int readnum() //Return int from the variable name
 void output(int op , int dest , int o1 , int o2) //Function to output the byte code to program.byte
 {
     instcount++;
-    char out[20];
+    char out[byteinstlength];
     snprintf(out, sizeof(out) , "%X %X %X %X\n", (unsigned char)op , (unsigned char)dest , (unsigned char)o1 , (unsigned char)o2);
     fputs(out , ofile);
 }
@@ -506,4 +833,6 @@ void startcompiler() //Starts the actual compilation process
     {
         compile();
     }
+    output(0 , 0 , 0 , 0);
+    handlebranch();
 }

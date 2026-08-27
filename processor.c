@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "processor.h"
 
 int registers[256];
@@ -7,6 +8,20 @@ int opcode , dest , src1 , src2;
 uint8_t flags; // 0 0 0 0 Z N C V
 extern char instruction[256] , data[4096];
 int end_of_simulation = 0;
+
+typedef struct
+{
+    int i0;
+    int i1;
+    int i2;
+    int i3;
+    int i4;
+    int i5;
+    int i6;
+    int i7;
+}vector;
+
+vector vregisters[32];
 
 int get_bit(uint8_t byte_val, int index)
 {
@@ -38,6 +53,11 @@ void decode()
 
 void execute()
 {
+    if(pc < 0 || pc >= 255)
+    {
+        fprintf(stderr, "pc( %d ) out of bounds\n" , pc);
+        exit(EXIT_FAILURE);
+    }
     switch(opcode)
     {
         case 0x00 :
@@ -66,7 +86,7 @@ void execute()
             if(res == 0) flags = flags | 0b00001000;
             if(res < 0) flags = flags | 0b00000100;
             if(o1 > o2) flags = flags | 0b00000010;
-            if((o1 ^ o2 < 0) && (res ^ o2 >= 0)) flags = flags | 0b00000001;
+            if(((o1 ^ o2) < 0) && ((res ^ o2) >= 0)) flags = flags | 0b00000001;
             break;
         }
 
@@ -80,12 +100,14 @@ void execute()
         case 0x04 :
         {
             int o1 = registers[src1] , o2 = registers[src2];
-            registers[dest] = o1 / o2;
+            int res = o1 / o2;
+            registers[dest] = res;
             break;
         }
 
         case 0x05 :
         {
+            src2 = registers[src2];
             unsigned char c0 = data[src2++];
             unsigned char c1 = data[src2++];
             unsigned char c2 = data[src2++];
@@ -104,7 +126,8 @@ void execute()
             unsigned char c1 = (o2 >> 8);
             unsigned char c2 = (o2 >> 16);
             unsigned char c3 = (o2 >> 24);
-
+            
+            dest = registers[dest];
             data[dest++] = c0;
             data[dest++] = c1;
             data[dest++] = c2;
@@ -139,7 +162,7 @@ void execute()
             if(res == 0) flags = flags | 0b00001000;
             if(res < 0) flags = flags | 0b00000100;
             if(o1 > o2) flags = flags | 0b00000010;
-            if((o1 ^ o2 < 0) && (res ^ o2 >= 0)) flags = flags | 0b00000001;
+            if(((o1 ^ o2) < 0) && ((res ^ o2) >= 0)) flags = flags | 0b00000001;
             break;
         }
 
@@ -153,7 +176,8 @@ void execute()
         case 0x0C :
         {
             int o1 = registers[src1] , o2 = src2;
-            registers[dest] = o1 / o2;
+            int res = o1 / o2;
+            registers[dest] = res;
             break;
         }
 
@@ -171,7 +195,7 @@ void execute()
 
         case 0x0E :
         {
-            int o2 = src2;
+            int o2 = registers[src2];
 
             unsigned char c0 = o2;
             unsigned char c1 = (o2 >> 8);
@@ -336,6 +360,488 @@ void execute()
         {
             int o2 = src2 * 4;
             pc += o2;
+            break;
+        }
+
+        case 0x21:
+        {
+            vector o1 = vregisters[src1] , o2 = vregisters[src2];
+            vector res;
+            res.i0 = o1.i0 + o2.i0;
+            res.i1 = o1.i1 + o2.i1;
+            res.i2 = o1.i2 + o2.i2;
+            res.i3 = o1.i3 + o2.i3;
+            res.i4 = o1.i4 + o2.i4;
+            res.i5 = o1.i5 + o2.i5;
+            res.i6 = o1.i6 + o2.i6;
+            res.i7 = o1.i7 + o2.i7;
+            vregisters[dest] = res;
+            break;
+        }
+
+        case 0x31:
+        {
+            vector o1 = vregisters[src1];
+            int o2 = registers[src2];
+            vector res;
+            res.i0 = o1.i0 + o2;
+            res.i1 = o1.i1 + o2;
+            res.i2 = o1.i2 + o2;
+            res.i3 = o1.i3 + o2;
+            res.i4 = o1.i4 + o2;
+            res.i5 = o1.i5 + o2;
+            res.i6 = o1.i6 + o2;
+            res.i7 = o1.i7 + o2;
+            vregisters[dest] = res;
+            break;
+        }
+
+        case 0x29:
+        {
+            vector o1 = vregisters[src1];
+            int o2 = src2;
+            vector res;
+            res.i0 = o1.i0 + o2;
+            res.i1 = o1.i1 + o2;
+            res.i2 = o1.i2 + o2;
+            res.i3 = o1.i3 + o2;
+            res.i4 = o1.i4 + o2;
+            res.i5 = o1.i5 + o2;
+            res.i6 = o1.i6 + o2;
+            res.i7 = o1.i7 + o2;
+            vregisters[dest] = res;
+            break;
+        }
+
+        case 0x22:
+        {
+            vector o1 = vregisters[src1] , o2 = vregisters[src2];
+            vector res;
+            res.i0 = o1.i0 - o2.i0;
+            res.i1 = o1.i1 - o2.i1;
+            res.i2 = o1.i2 - o2.i2;
+            res.i3 = o1.i3 - o2.i3;
+            res.i4 = o1.i4 - o2.i4;
+            res.i5 = o1.i5 - o2.i5;
+            res.i6 = o1.i6 - o2.i6;
+            res.i7 = o1.i7 - o2.i7;
+            vregisters[dest] = res;
+            break;
+        }
+
+        case 0x32:
+        {
+            vector o1 = vregisters[src1];
+            int o2 = registers[src2];
+            vector res;
+            res.i0 = o1.i0 - o2;
+            res.i1 = o1.i1 - o2;
+            res.i2 = o1.i2 - o2;
+            res.i3 = o1.i3 - o2;
+            res.i4 = o1.i4 - o2;
+            res.i5 = o1.i5 - o2;
+            res.i6 = o1.i6 - o2;
+            res.i7 = o1.i7 - o2;
+            vregisters[dest] = res;
+            break;
+        }
+
+        case 0x2A:
+        {
+            vector o1 = vregisters[src1];
+            int o2 = src2;
+            vector res;
+            res.i0 = o1.i0 - o2;
+            res.i1 = o1.i1 - o2;
+            res.i2 = o1.i2 - o2;
+            res.i3 = o1.i3 - o2;
+            res.i4 = o1.i4 - o2;
+            res.i5 = o1.i5 - o2;
+            res.i6 = o1.i6 - o2;
+            res.i7 = o1.i7 - o2;
+            vregisters[dest] = res;
+            break;
+        }
+
+        case 0x23:
+        {
+            vector o1 = vregisters[src1] , o2 = vregisters[src2];
+            vector res;
+            res.i0 = o1.i0 * o2.i0;
+            res.i1 = o1.i1 * o2.i1;
+            res.i2 = o1.i2 * o2.i2;
+            res.i3 = o1.i3 * o2.i3;
+            res.i4 = o1.i4 * o2.i4;
+            res.i5 = o1.i5 * o2.i5;
+            res.i6 = o1.i6 * o2.i6;
+            res.i7 = o1.i7 * o2.i7;
+            vregisters[dest] = res;
+            break;
+        }
+
+        case 0x33:
+        {
+            vector o1 = vregisters[src1];
+            int o2 = registers[src2];
+            vector res;
+            res.i0 = o1.i0 * o2;
+            res.i1 = o1.i1 * o2;
+            res.i2 = o1.i2 * o2;
+            res.i3 = o1.i3 * o2;
+            res.i4 = o1.i4 * o2;
+            res.i5 = o1.i5 * o2;
+            res.i6 = o1.i6 * o2;
+            res.i7 = o1.i7 * o2;
+            vregisters[dest] = res;
+            break;
+        }
+
+        case 0x2B:
+        {
+            vector o1 = vregisters[src1];
+            int o2 = src2;
+            vector res;
+            res.i0 = o1.i0 * o2;
+            res.i1 = o1.i1 * o2;
+            res.i2 = o1.i2 * o2;
+            res.i3 = o1.i3 * o2;
+            res.i4 = o1.i4 * o2;
+            res.i5 = o1.i5 * o2;
+            res.i6 = o1.i6 * o2;
+            res.i7 = o1.i7 * o2;
+            vregisters[dest] = res;
+            break;
+        }
+
+        case 0x25:
+        {
+            vector res;
+            src2 = registers[src2];
+            unsigned char c0 = data[src2++];
+            unsigned char c1 = data[src2++];
+            unsigned char c2 = data[src2++];
+            unsigned char c3 = data[src2++];
+
+            int a = (unsigned int) c0 | ((unsigned int) c1 << 8) | ((unsigned int) c2 << 16) | ((unsigned int) c3 << 24);
+            res.i0 = a;
+
+            c0 = data[src2++];
+            c1 = data[src2++];
+            c2 = data[src2++];
+            c3 = data[src2++];
+
+            a = (unsigned int) c0 | ((unsigned int) c1 << 8) | ((unsigned int) c2 << 16) | ((unsigned int) c3 << 24);
+            res.i1 = a;
+
+            c0 = data[src2++];
+            c1 = data[src2++];
+            c2 = data[src2++];
+            c3 = data[src2++];
+
+            a = (unsigned int) c0 | ((unsigned int) c1 << 8) | ((unsigned int) c2 << 16) | ((unsigned int) c3 << 24);
+            res.i2 = a;
+
+            c0 = data[src2++];
+            c1 = data[src2++];
+            c2 = data[src2++];
+            c3 = data[src2++];
+
+            a = (unsigned int) c0 | ((unsigned int) c1 << 8) | ((unsigned int) c2 << 16) | ((unsigned int) c3 << 24);
+            res.i3 = a;
+
+            c0 = data[src2++];
+            c1 = data[src2++];
+            c2 = data[src2++];
+            c3 = data[src2++];
+
+            a = (unsigned int) c0 | ((unsigned int) c1 << 8) | ((unsigned int) c2 << 16) | ((unsigned int) c3 << 24);
+            res.i4 = a;
+
+            c0 = data[src2++];
+            c1 = data[src2++];
+            c2 = data[src2++];
+            c3 = data[src2++];
+
+            a = (unsigned int) c0 | ((unsigned int) c1 << 8) | ((unsigned int) c2 << 16) | ((unsigned int) c3 << 24);
+            res.i5 = a;
+
+            c0 = data[src2++];
+            c1 = data[src2++];
+            c2 = data[src2++];
+            c3 = data[src2++];
+
+            a = (unsigned int) c0 | ((unsigned int) c1 << 8) | ((unsigned int) c2 << 16) | ((unsigned int) c3 << 24);
+            res.i6 = a;
+
+            c0 = data[src2++];
+            c1 = data[src2++];
+            c2 = data[src2++];
+            c3 = data[src2++];
+
+            a = (unsigned int) c0 | ((unsigned int) c1 << 8) | ((unsigned int) c2 << 16) | ((unsigned int) c3 << 24);
+            res.i7 = a;
+
+            vregisters[dest] = res;
+            break;
+        }
+
+        case 0x2C:
+        {
+            vector res;
+            unsigned char c0 = data[src2++];
+            unsigned char c1 = data[src2++];
+            unsigned char c2 = data[src2++];
+            unsigned char c3 = data[src2++];
+
+            int a = (unsigned int) c0 | ((unsigned int) c1 << 8) | ((unsigned int) c2 << 16) | ((unsigned int) c3 << 24);
+            res.i0 = a;
+
+            c0 = data[src2++];
+            c1 = data[src2++];
+            c2 = data[src2++];
+            c3 = data[src2++];
+
+            a = (unsigned int) c0 | ((unsigned int) c1 << 8) | ((unsigned int) c2 << 16) | ((unsigned int) c3 << 24);
+            res.i1 = a;
+
+            c0 = data[src2++];
+            c1 = data[src2++];
+            c2 = data[src2++];
+            c3 = data[src2++];
+
+            a = (unsigned int) c0 | ((unsigned int) c1 << 8) | ((unsigned int) c2 << 16) | ((unsigned int) c3 << 24);
+            res.i2 = a;
+
+            c0 = data[src2++];
+            c1 = data[src2++];
+            c2 = data[src2++];
+            c3 = data[src2++];
+
+            a = (unsigned int) c0 | ((unsigned int) c1 << 8) | ((unsigned int) c2 << 16) | ((unsigned int) c3 << 24);
+            res.i3 = a;
+
+            c0 = data[src2++];
+            c1 = data[src2++];
+            c2 = data[src2++];
+            c3 = data[src2++];
+
+            a = (unsigned int) c0 | ((unsigned int) c1 << 8) | ((unsigned int) c2 << 16) | ((unsigned int) c3 << 24);
+            res.i4 = a;
+
+            c0 = data[src2++];
+            c1 = data[src2++];
+            c2 = data[src2++];
+            c3 = data[src2++];
+
+            a = (unsigned int) c0 | ((unsigned int) c1 << 8) | ((unsigned int) c2 << 16) | ((unsigned int) c3 << 24);
+            res.i5 = a;
+
+            c0 = data[src2++];
+            c1 = data[src2++];
+            c2 = data[src2++];
+            c3 = data[src2++];
+
+            a = (unsigned int) c0 | ((unsigned int) c1 << 8) | ((unsigned int) c2 << 16) | ((unsigned int) c3 << 24);
+            res.i6 = a;
+
+            c0 = data[src2++];
+            c1 = data[src2++];
+            c2 = data[src2++];
+            c3 = data[src2++];
+
+            a = (unsigned int) c0 | ((unsigned int) c1 << 8) | ((unsigned int) c2 << 16) | ((unsigned int) c3 << 24);
+            res.i7 = a;
+
+            vregisters[dest] = res;
+            break;
+        }
+
+        case 0x26:
+        {
+            vector vec = vregisters[src2];
+            int o2 = vec.i0;
+            dest = registers[dest];
+
+            unsigned char c0 = o2;
+            unsigned char c1 = (o2 >> 8);
+            unsigned char c2 = (o2 >> 16);
+            unsigned char c3 = (o2 >> 24);
+
+            data[dest++] = c0;
+            data[dest++] = c1;
+            data[dest++] = c2;
+            data[dest++] = c3;
+
+            o2 = vec.i1;
+            c0 = o2;
+            c1 = (o2 >> 8);
+            c2 = (o2 >> 16);
+            c3 = (o2 >> 24);
+
+            data[dest++] = c0;
+            data[dest++] = c1;
+            data[dest++] = c2;
+            data[dest++] = c3;
+
+            o2 = vec.i2;
+            c0 = o2;
+            c1 = (o2 >> 8);
+            c2 = (o2 >> 16);
+            c3 = (o2 >> 24);
+
+            data[dest++] = c0;
+            data[dest++] = c1;
+            data[dest++] = c2;
+            data[dest++] = c3;
+
+            o2 = vec.i3;
+            c0 = o2;
+            c1 = (o2 >> 8);
+            c2 = (o2 >> 16);
+            c3 = (o2 >> 24);
+
+            data[dest++] = c0;
+            data[dest++] = c1;
+            data[dest++] = c2;
+            data[dest++] = c3;
+
+            o2 = vec.i4;
+            c0 = o2;
+            c1 = (o2 >> 8);
+            c2 = (o2 >> 16);
+            c3 = (o2 >> 24);
+
+            data[dest++] = c0;
+            data[dest++] = c1;
+            data[dest++] = c2;
+            data[dest++] = c3;
+
+            o2 = vec.i5;
+            c0 = o2;
+            c1 = (o2 >> 8);
+            c2 = (o2 >> 16);
+            c3 = (o2 >> 24);
+
+            data[dest++] = c0;
+            data[dest++] = c1;
+            data[dest++] = c2;
+            data[dest++] = c3;
+
+            o2 = vec.i6;
+            c0 = o2;
+            c1 = (o2 >> 8);
+            c2 = (o2 >> 16);
+            c3 = (o2 >> 24);
+
+            data[dest++] = c0;
+            data[dest++] = c1;
+            data[dest++] = c2;
+            data[dest++] = c3;
+
+            o2 = vec.i7;
+            c0 = o2;
+            c1 = (o2 >> 8);
+            c2 = (o2 >> 16);
+            c3 = (o2 >> 24);
+
+            data[dest++] = c0;
+            data[dest++] = c1;
+            data[dest++] = c2;
+            data[dest++] = c3;
+            break;
+        }
+
+        case 0x2E:
+        {
+            vector vec = vregisters[src2];
+            int o2 = vec.i0;
+
+            unsigned char c0 = o2;
+            unsigned char c1 = (o2 >> 8);
+            unsigned char c2 = (o2 >> 16);
+            unsigned char c3 = (o2 >> 24);
+
+            data[dest++] = c0;
+            data[dest++] = c1;
+            data[dest++] = c2;
+            data[dest++] = c3;
+
+            o2 = vec.i1;
+            c0 = o2;
+            c1 = (o2 >> 8);
+            c2 = (o2 >> 16);
+            c3 = (o2 >> 24);
+
+            data[dest++] = c0;
+            data[dest++] = c1;
+            data[dest++] = c2;
+            data[dest++] = c3;
+
+            o2 = vec.i2;
+            c0 = o2;
+            c1 = (o2 >> 8);
+            c2 = (o2 >> 16);
+            c3 = (o2 >> 24);
+
+            data[dest++] = c0;
+            data[dest++] = c1;
+            data[dest++] = c2;
+            data[dest++] = c3;
+
+            o2 = vec.i3;
+            c0 = o2;
+            c1 = (o2 >> 8);
+            c2 = (o2 >> 16);
+            c3 = (o2 >> 24);
+
+            data[dest++] = c0;
+            data[dest++] = c1;
+            data[dest++] = c2;
+            data[dest++] = c3;
+
+            o2 = vec.i4;
+            c0 = o2;
+            c1 = (o2 >> 8);
+            c2 = (o2 >> 16);
+            c3 = (o2 >> 24);
+
+            data[dest++] = c0;
+            data[dest++] = c1;
+            data[dest++] = c2;
+            data[dest++] = c3;
+
+            o2 = vec.i5;
+            c0 = o2;
+            c1 = (o2 >> 8);
+            c2 = (o2 >> 16);
+            c3 = (o2 >> 24);
+
+            data[dest++] = c0;
+            data[dest++] = c1;
+            data[dest++] = c2;
+            data[dest++] = c3;
+
+            o2 = vec.i6;
+            c0 = o2;
+            c1 = (o2 >> 8);
+            c2 = (o2 >> 16);
+            c3 = (o2 >> 24);
+
+            data[dest++] = c0;
+            data[dest++] = c1;
+            data[dest++] = c2;
+            data[dest++] = c3;
+
+            o2 = vec.i7;
+            c0 = o2;
+            c1 = (o2 >> 8);
+            c2 = (o2 >> 16);
+            c3 = (o2 >> 24);
+
+            data[dest++] = c0;
+            data[dest++] = c1;
+            data[dest++] = c2;
+            data[dest++] = c3;
             break;
         }
     }
