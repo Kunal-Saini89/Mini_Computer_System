@@ -1,11 +1,12 @@
 #ifndef MEMORY_H
 #define MEMORY_H
 
-extern FILE *ofile;
-extern FILE *dfile;
+#include "processor.h"
+
+extern char instruction[NP][256] , data[NP][4096];
 
 // Function prototypes
-void initialize();
-void finalize();
+void initialize(int , char * , char *);
+void finalize(int , char *);
 
 #endif

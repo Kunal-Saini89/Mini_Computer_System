@@ -1,6 +1,8 @@
 #ifndef COMPILER_H
 #define COMPILER_H
 
+#include <stdio.h>
+
 extern FILE *ifile;
 extern FILE *ofile;
 
@@ -19,9 +21,10 @@ void compileread();
 void compilewrite();
 void compilenewwrite();
 void compilemath();
+void compileprint();
 void throwerror();
 int readnum();
-void output(int , int , int , int);
-void startcompiler();
+void output(int , int , int , int );
+int startcompiler(char * , char *);
 
 #endif

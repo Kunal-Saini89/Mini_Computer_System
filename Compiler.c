@@ -6,6 +6,9 @@
 #include <ctype.h>
 #include "Compiler.h"
 
+FILE *ifile = NULL;
+FILE *ofile = NULL;
+
 #define maxlablelength 100
 #define maxlablesupport 64
 #define maxinstlenght 100
@@ -166,7 +169,7 @@ void handlebranch()
             {
                 if(strcmp(record[i].name , line) == 0)
                 {
-                    o2 = record[i].offset - branchinst[currinst];
+                    o2 = record[i].offset - branchinst[currinst] - 1;
                 }
             }
             int op = 0 , test , offset;
@@ -238,6 +241,12 @@ void compile() // Start compilation of a single instruction
             comiplevectormath();
             break;
 
+        case 'P':
+        case 'p':
+            advance();
+            compileprint();
+            break;
+
         default:
             if(isspace(temp))
             {
@@ -263,7 +272,7 @@ void compilelable()
     {
         if(strcmp(record[i].name , str) == 0) // Strings are equal
         {
-            fprintf(stderr, "Multiple lables can't have a same name", line);
+            fprintf(stderr, "Multiple lables can't have a same name in line : %d\n", line);
             exit(EXIT_FAILURE);
         }
         else if(record[i].name[0] == '\0') break;
@@ -588,7 +597,7 @@ void compileread() //Handle read instruction
     {
         value = readnum();
     }
-    else throwerror;
+    else throwerror();
 
     output(5 , dest , 0 , value);
 }
@@ -628,7 +637,7 @@ void compilewrite() //Handle write instruction
     {
         dest = readnum();
     }
-    else throwerror;
+    else throwerror();
 
     output(6 , dest , 0 , value);
 }
@@ -795,6 +804,36 @@ void compilemath() //Handle math opertaions
     }
 }
 
+void compileprint() //Handle print instruction
+{
+    char temp = getcurrchar();
+    if(temp == 'r' || temp == 'R') temp = advance();
+    else throwerror();
+
+    if(temp == 'i' || temp == 'I') temp = advance();
+    else throwerror();
+
+    if(temp == 'n' || temp == 'N') temp = advance();
+    else throwerror();
+
+    if(temp == 't' || temp == 'T') temp = advance();
+    else throwerror();
+
+    int o2 = 0;
+    if(temp == 'x' || temp == 'X')
+    {
+        if(!isdigit((unsigned char) peek()))
+        {
+            throwerror();
+        }
+        advance();
+        o2 = readnum();
+    }
+    else throwerror();
+
+    output(8 , 0 , 0 , o2);
+}
+
 void throwerror() //Show error in the byte file
 {
     fprintf(stderr, "Compilation error in line %d , character : %c , peek : %c\n", line , getcurrchar() , peek());
@@ -813,7 +852,11 @@ int readnum() //Return int from the variable name
         temp = advance();
     }
     if(res <= 255) return res;
-    else throwerror();
+    else 
+    {
+        throwerror();
+        return 0;
+    }
 }
 
 void output(int op , int dest , int o1 , int o2) //Function to output the byte code to program.byte
@@ -824,10 +867,37 @@ void output(int op , int dest , int o1 , int o2) //Function to output the byte c
     fputs(out , ofile);
 }
 
-void startcompiler() //Starts the actual compilation process 
+int startcompiler(char *input_path, char *output_path) //Starts the actual compilation process 
 {
+    ifile = fopen(input_path , "r");
+    if(ifile == NULL)
+    {
+        fprintf(stderr, "Failed to open input file: %s\n", input_path);
+        return -1;
+    }
+    ofile = fopen(output_path , "w+");
+    if(ofile == NULL)
+    {
+        fprintf(stderr, "Failed to open output file: %s\n", output_path);
+        fclose(ifile);
+        ifile = NULL;
+        return -1;
+    }
+
+    cchar = 0;
+    line = 1;
+    instcount = 0;
+    currinst = 0;
+    for(int i = 0; i < maxlablesupport; i++)
+    {
+        record[i].name[0] = '\0';
+        record[i].offset = 0;
+        branchinst[i] = 0;
+    }
+
     fseek(ifile , 0 , SEEK_END);
     filesize = ftell(ifile);
+    fseek(ifile , 0 , SEEK_SET);
 
     while(cchar < filesize)
     {
@@ -835,4 +905,10 @@ void startcompiler() //Starts the actual compilation process
     }
     output(0 , 0 , 0 , 0);
     handlebranch();
+
+    fclose(ifile);
+    fclose(ofile);
+    ifile = NULL;
+    ofile = NULL;
+    return 0;
 }
