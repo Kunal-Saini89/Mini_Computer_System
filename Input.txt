@@ -1,0 +1,5 @@
+Test_Cases/t1.txt Test_Cases/d1.byte
+Test_Cases/t2.txt Test_Cases/d2.byte
+Test_Cases/t3.txt Test_Cases/d3.byte
+Test_Cases/t4.txt Test_Cases/d4.byte
+Test_Cases/Sum_of_2Arrays(source).txt Test_Cases/Sum_of_2Arrays(data).byte
