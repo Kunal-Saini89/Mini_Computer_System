@@ -1,9 +1,0 @@
-x1 = 20
-x2 = 23
-.loop
-x1 = x1 + 1
-print x1
-x3 = x1 - x2
-BNE .loop
-[0] = x1
-
