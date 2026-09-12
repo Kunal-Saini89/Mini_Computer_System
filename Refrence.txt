@@ -1,0 +1,152 @@
+Here is the line-by-line explanation of the new Lab 5 code in 
+memory.c
+, and how it works with 
+os.c
+ and 
+processor.c
+.
+
+Part 1: 
+memory.c
+ Breakdown
+1. The Global Physical RAM
+c
+
+
+7: char memory[MEMSIZE];
+8: int isize = 1024 , dsize = 4096;
+memory[MEMSIZE]: The single 8192-byte physical RAM array. All processor cores and all tasks store their code and data inside this single buffer.
+isize = 1024: Max instruction size in bytes (2 pages of 512 bytes each).
+dsize = 4096: Max data memory size in bytes (8 pages of 512 bytes each).
+2. initialize(pid, prog_file, data_file) (Lines 10–112)
+Step A: Cleanup Old Pages (Lines 18–27)
+c
+
+
+18:     // Free any old pages if previously allocated
+19:     for(int idx = 0 ; idx < NUM_LOGICAL_PAGES ; idx++)
+20:     {
+21:         int f = (unsigned char) pageTable[pid][idx];
+22:         if(f > 0)
+23:         {
+24:             freePage(f);
+25:             pageTable[pid][idx] = 0;
+26:         }
+27:     }
+If this core previously ran a task, it loops through all 10 slots of pageTable[pid] and frees any previously held physical frames.
+Step B: Read program.byte & Allocate Instruction Pages (Lines 29–54)
+c
+
+
+34:         while(fscanf(pfile , "%X %X %X %X" , &op , &dest , &o1 , &o2) == 4 && i < isize)
+35:         {
+36:             int page_idx = i / PAGESIZE;
+37:             if((unsigned char) pageTable[pid][page_idx] == 0)
+38:             {
+39:                 int frame = getFreePage();
+40:                 if(frame == -1) break;
+41:                 pageTable[pid][page_idx] = frame;
+42:                 for(int b = 0 ; b < PAGESIZE ; b++)
+43:                 {
+44:                     memory[frame * PAGESIZE + b] = 0;
+45:                 }
+46:             }
+47: 
+48:             memory[getPhysicallAddress(pid , 1 , i++)] = (char) op;
+49:             memory[getPhysicallAddress(pid , 1 , i++)] = (char) dest;
+50:             memory[getPhysicallAddress(pid , 1 , i++)] = (char) o1;
+51:             memory[getPhysicallAddress(pid , 1 , i++)] = (char) o2;
+52:         }
+Line 36 (page_idx = i / PAGESIZE): Calculates whether the byte belongs to Page 0 or Page 1.
+Lines 37–46: If this page has not been assigned a physical frame yet (pageTable == 0):
+Calls getFreePage() to get an empty physical frame from RAM.
+Records the frame in pageTable[pid][page_idx] = frame.
+Zeroes out all 512 bytes in that physical frame.
+Lines 48–51: Writes the 4 instruction bytes into physical RAM using getPhysicallAddress(pid, 1, i).
+Step C: Read data.byte & Allocate Data Pages (Lines 70–96)
+c
+
+
+76:         while(fscanf(dfile , "%X %X %X %X" , &j0 , &j1 , &j2 , &j3) == 4 && i < dsize)
+77:         {
+78:             int page_idx = i / PAGESIZE + 1024 / PAGESIZE;
+79:             if((unsigned char) pageTable[pid][page_idx] == 0)
+80:             {
+81:                 int frame = getFreePage();
+82:                 if(frame == -1) break;
+83:                 pageTable[pid][page_idx] = frame;
+84:                 for(int b = 0 ; b < PAGESIZE ; b++)
+85:                 {
+86:                     memory[frame * PAGESIZE + b] = 0;
+87:                 }
+88:             }
+89: 
+90:             memory[getPhysicallAddress(pid , 0 , i++)] = (char) j0;
+91:             memory[getPhysicallAddress(pid , 0 , i++)] = (char) j1;
+92:             memory[getPhysicallAddress(pid , 0 , i++)] = (char) j2;
+93:             memory[getPhysicallAddress(pid , 0 , i++)] = (char) j3;
+94:         }
+Line 78 (page_idx = i / PAGESIZE + 2): Calculates the data page number in the Page Table (Slots 2 to 9).
+Lines 79–88: Dynamically requests a free frame via getFreePage() and maps it into pageTable[pid][page_idx].
+Lines 90–93: Writes the 4 data bytes into physical RAM at getPhysicallAddress(pid, 0, i).
+3. finalize(pid, data_file) (Lines 114–151)
+c
+
+
+130:     for(int i = 0 ; i < dsize ; i += 4)
+131:     {
+132:         unsigned char c0 = memory[getPhysicallAddress(pid , 0 , i)];
+133:         unsigned char c1 = memory[getPhysicallAddress(pid , 0 , i + 1)];
+134:         unsigned char c2 = memory[getPhysicallAddress(pid , 0 , i + 2)];
+135:         unsigned char c3 = memory[getPhysicallAddress(pid , 0 , i + 3)];
+136:         snprintf(out , sizeof(out) , "%X %X %X %X\n" , c0 , c1 , c2 , c3);
+137:         fputs(out , dfile);
+138:     }
+Reads the final modified data from physical memory[] using getPhysicallAddress() and writes it out to data.byte.
+c
+
+
+142:     // Free all physical pages allocated to this task
+143:     for(int idx = 0 ; idx < NUM_LOGICAL_PAGES ; idx++)
+144:     {
+145:         int frame = (unsigned char) pageTable[pid][idx];
+146:         if(frame > 0)
+147:         {
+148:             freePage(frame);
+149:             pageTable[pid][idx] = 0;
+150:         }
+151:     }
+Releases all physical frames used by this task back into freePages[] so waiting tasks can reuse them.
+Part 2: How processor.c uses this
+In 
+processor.c
+, the processor never accesses memory directly. Every access is translated:
+
+1. Fetching Instructions:
+c
+
+
+int addr = pc[pid];
+opcode[pid] = memory[getPhysicallAddress(pid, 1, addr)];
+dest[pid]   = memory[getPhysicallAddress(pid, 1, addr + 1)];
+src1[pid]   = memory[getPhysicallAddress(pid, 1, addr + 2)];
+src2[pid]   = memory[getPhysicallAddress(pid, 1, addr + 3)];
+pc[pid] += 4;
+2. Reading Memory (x1 = [x2]):
+c
+
+
+int addr = registers[pid][s2];
+unsigned char c0 = memory[getPhysicallAddress(pid, 0, addr)];
+unsigned char c1 = memory[getPhysicallAddress(pid, 0, addr + 1)];
+unsigned char c2 = memory[getPhysicallAddress(pid, 0, addr + 2)];
+unsigned char c3 = memory[getPhysicallAddress(pid, 0, addr + 3)];
+3. Writing Memory ([x2] = x1):
+c
+
+
+int addr = registers[pid][d];
+memory[getPhysicallAddress(pid, 0, addr)]     = c0;
+memory[getPhysicallAddress(pid, 0, addr + 1)] = c1;
+memory[getPhysicallAddress(pid, 0, addr + 2)] = c2;
+memory[getPhysicallAddress(pid, 0, addr + 3)] = c3;
